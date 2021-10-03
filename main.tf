@@ -14,6 +14,12 @@ provider "linode" {
 
 // vars
 
+variable private_key {
+  description = "private key file location"
+  type = string
+  default = "~/.ssh/id_ed25519.pub"
+}
+
 variable "linode_token" {
   description = "access token"
   type = string
@@ -37,7 +43,7 @@ variable "linode_image" {
 
 variable "label" {
   description = "Human-friendly name"
-  default = "mw-web"
+  default = "mediawiki-web"
 }
 
 variable "region" {
@@ -96,9 +102,20 @@ resource "linode_instance" "webhead" {
     root_device = "sda"
 
   }
+  provisioner "remote-exec" {
+    inline = ["hostnamectl set-hostname ${var.label}-${count.index}"]
+
+    connection {
+      host = self.ip_address
+      type = "ssh"
+      user = "root"
+      private_key = file(var.private_key)
+
+    }
+  }
 
   provisioner "local-exec" {
-    command = "sleep 30; ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -u root -i ',${self.ip_address}' ~/code/riichilab/ansible-roles/linode-web.yml"
+    command = "sleep 100; ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -u root -i ',${self.ip_address}' ~/code/riichilab/ansible-roles/linode-web.yml"
 
   }
 
