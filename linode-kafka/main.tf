@@ -8,13 +8,27 @@ terraform {
   }
 }
 
+// end providers
+
+
 provider "linode" {
   token = var.linode_token
 }
 
-// vars
+// begin vars
 
-variable private_key {
+variable "linode_domain_id" {
+  description = "domain ID per Linode Domains API"
+  type = number
+}
+
+variable "instance_count" {
+  description = "Number of Linodes to deploy"
+  type        = number
+  default = 2
+}
+
+variable "private_key" {
   description = "private key file location"
   type = string
   default = "~/.ssh/id_ed25519.pub"
@@ -30,12 +44,6 @@ variable "linode_disk_size" {
   default = 50000
 }
 
-variable "instance_count" {
-  description = "Number of Linodes to deploy"
-  type        = number
-  default = 2
-}
-
 variable "linode_image" {
   description = "Image to build from"
   default = "linode/almalinux8"
@@ -43,7 +51,7 @@ variable "linode_image" {
 
 variable "label" {
   description = "Human-friendly name"
-  default = "mediawiki-web"
+  default = "bigbag_web"
 }
 
 variable "region" {
@@ -62,7 +70,9 @@ variable "stackscript_id" {
   default = 909122
 }
 
-// resources
+// end vars
+
+// begin resources
 
 resource "linode_sshkey" "homekey" {
   label = "foo"
@@ -74,7 +84,7 @@ resource "random_string" "rootpw" {
   special = true
 }
 
-resource "linode_instance" "webhead" {
+resource "linode_instance" "kafka_zk" {
   count = var.instance_count
   label = "${var.label}-${count.index}"
   // image = var.linode_image
@@ -91,19 +101,27 @@ resource "linode_instance" "webhead" {
     authorized_keys = [linode_sshkey.homekey.ssh_key]
     root_pass = random_string.rootpw.result
   }
+
   config {
     label = "linode_boot_config"
     kernel = "linode/grub2"
+    interface {
+      purpose = "public"
+  // public interfaces cannot have a label
+    }
+    interface {
+      purpose = "vlan"
+      label = "boofernet"
+        }
     devices {
       sda {
         disk_label = "bootme"
         }
       }
     root_device = "sda"
-
-  }
+        }
   provisioner "remote-exec" {
-    inline = ["hostnamectl set-hostname ${var.label}-${count.index}"]
+    inline = ["hostnamectl set-hostname ${var.label}_${count.index}"]
 
     connection {
       host = self.ip_address
@@ -122,29 +140,36 @@ resource "linode_instance" "webhead" {
   boot_config_label = "linode_boot_config"
 }
 
-resource "linode_nodebalancer" "mediawiki-lb" {
-  label = "mediawiki-lb"
-  region = var.region
-  client_conn_throttle = 10
-}
 
-resource "linode_nodebalancer_config" "web_config" {
-  nodebalancer_id = linode_nodebalancer.mediawiki-lb.id
-  port = 80
-  protocol = "http"
-  check = "http"
-  check_path = "/"
-  check_attempts = 3
-  check_timeout = 30
-  stickiness = "http_cookie"
-  algorithm = "source"
+// resource "linode_nodebalancer_node" "secure_upstreams" {
+//   count = var.instance_count
+//   nodebalancer_id = linode_nodebalancer.bigbag_lb.id
+//   config_id = linode_nodebalancer_config.secure_config.id
+//   address ="${element(linode_instance.kafka_zk.*.private_ip_address, count.index)}:80"
+//   label = "${var.label}_secure_mw_lb"
+// }
 
-}
 
-resource "linode_nodebalancer_node" "upstreams" {
+resource "linode_domain_record" "bigbag_a_records" {
   count = var.instance_count
-  nodebalancer_id = linode_nodebalancer.mediawiki-lb.id
-  config_id = linode_nodebalancer_config.web_config.id
-  address ="${element(linode_instance.webhead.*.private_ip_address, count.index)}:80"
-  label = "${var.label}-mediawiki-lb"
-}
+  domain_id = var.linode_domain_id
+  name = "${element(linode_instance.kafka_zk.*.label, count.index)}"
+  record_type = "A"
+  target = "${element(linode_instance.kafka_zk.*.ip_address, count.index)}"
+  }
+
+  resource "linode_domain_record" "bigbag_aaaa_records" {
+    count = var.instance_count
+    domain_id = var.linode_domain_id
+    name = "${element(linode_instance.kafka_zk.*.label, count.index)}"
+    record_type = "AAAA"
+    target = split("/", "${element(linode_instance.kafka_zk.*.ipv6, count.index)}").0
+    }
+
+
+  // resource "linode_domain_record" "bigbag_aaaa_record" {
+  //   domain_id = var.linode_domain_id
+  //   name = "mw"
+  //   record_type = "AAAA"
+  //   target = linode_nodebalancer.bigbag_lb.ipv6
+  //   }
