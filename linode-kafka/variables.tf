@@ -32,9 +32,9 @@ variable "linode_image" {
   default = "linode/almalinux8"
 }
 
-variable "broker_label" {
+variable "kraft_label" {
   description = "Human-friendly name"
-  default = "bigbag_kafka_broker"
+  default = "bigbag_kafka_kraft"
 }
 
 variable "zk_label" {

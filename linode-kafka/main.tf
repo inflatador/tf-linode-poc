@@ -95,12 +95,12 @@ resource "random_integer" "private_ip_var" {
 // end kafka zookeeper
 
 
-// begin kafka broker
-resource "linode_instance" "kafka_broker" {
+// begin kafka kraft
+resource "linode_instance" "kafka_kraft" {
   count = 3
   group = var.group
   tags = var.tags
-  label = "${var.broker_label}_${count.index}"
+  label = "${var.kraft_label}_${count.index}"
   // image = var.linode_image
 
   region = var.region
@@ -137,7 +137,7 @@ resource "linode_instance" "kafka_broker" {
     root_device = "sda"
         }
   provisioner "remote-exec" {
-    inline = ["hostnamectl set-hostname ${var.broker_label}_${count.index}"]
+    inline = ["hostnamectl set-hostname ${var.kraft_label}_${count.index}"]
 
     connection {
       host = self.ip_address
@@ -149,14 +149,14 @@ resource "linode_instance" "kafka_broker" {
   }
 
   provisioner "local-exec" {
-    command = "sleep 100; ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -u root -i ',${self.ip_address}' /Users/gizzmonic/code/riichilab/ansible-roles/linode-kafka-broker.yml"
+    command = "sleep 100; ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -u root -i ',${self.ip_address}' /Users/gizzmonic/code/riichilab/ansible-roles/linode-kafka-kraft.yml"
 
   }
 
   boot_config_label = "linode_boot_config"
 }
 
-// end kafka broker
+// end kafka kraft
 
 // begin DNS resources
 
@@ -169,27 +169,27 @@ resource "linode_instance" "kafka_broker" {
 //   }
 //
 // resource "linode_domain_record" "kafka_zk_aaaa_records" {
-//   count = length(linode_instance.kafka_broker)
+//   count = length(linode_instance.kafka_kraft)
 //   domain_id = var.linode_domain_id
 //   name = "${element(linode_instance.kafka_zk.*.label, count.index)}"
 //   record_type = "AAAA"
 //   target = split("/", "${element(linode_instance.kafka_zk.*.ipv6, count.index)}").0
 //   }
 
-resource "linode_domain_record" "kafka_broker_a_records" {
+resource "linode_domain_record" "kafka_kraft_a_records" {
   count = var.instance_count
   domain_id = var.linode_domain_id
-  name = "${element(linode_instance.kafka_broker.*.label, count.index)}"
+  name = "${element(linode_instance.kafka_kraft.*.label, count.index)}"
   record_type = "A"
-  target = "${element(linode_instance.kafka_broker.*.ip_address, count.index)}"
+  target = "${element(linode_instance.kafka_kraft.*.ip_address, count.index)}"
   }
 
-resource "linode_domain_record" "kafka_broker_aaaa_records" {
+resource "linode_domain_record" "kafka_kraft_aaaa_records" {
   count = var.instance_count
   domain_id = var.linode_domain_id
-  name = "${element(linode_instance.kafka_broker.*.label, count.index)}"
+  name = "${element(linode_instance.kafka_kraft.*.label, count.index)}"
   record_type = "AAAA"
-  target = split("/", "${element(linode_instance.kafka_broker.*.ipv6, count.index)}").0
+  target = split("/", "${element(linode_instance.kafka_kraft.*.ipv6, count.index)}").0
   }
 
 
