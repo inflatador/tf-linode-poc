@@ -126,8 +126,8 @@ resource "linode_instance" "kafka_kraft" {
     }
     interface {
       purpose = "vlan"
-      label = "boofernet"
-      ipam_address = "172.24.109.1${count.index}/24"
+      label = "inside"
+      ipam_address = "172.17.147.1${count.index}/24"
         }
     devices {
       sda {
